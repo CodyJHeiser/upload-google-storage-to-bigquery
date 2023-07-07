@@ -1,2 +1,8 @@
 # .env files
 .env
+
+# node modules
+node_modules
+
+# sensitive
+test/test-file.tsv
