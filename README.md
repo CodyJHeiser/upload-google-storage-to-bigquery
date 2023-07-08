@@ -13,7 +13,7 @@ npm install upload-google-storage-to-bigquery
 ## Usage
 
 ```javascript
-import { BigQueryUploader } from 'upload-google-storage-to-bigquery';
+import BigQueryUploader from 'upload-google-storage-to-bigquery';
 
 const uploader = new BigQueryUploader('path/to/keyfile.json');
 
