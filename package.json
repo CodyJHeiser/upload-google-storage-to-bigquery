@@ -1,6 +1,6 @@
 {
   "name": "upload-google-storage-to-bigquery",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Transfer large files locally to Google Storage then to BigQuery",
   "main": "./index.js",
   "type": "module",
