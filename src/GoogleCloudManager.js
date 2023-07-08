@@ -31,14 +31,18 @@ class GoogleCloudManager {
 
         let bucket = this.storage.bucket(bucketName);
 
-        // Check if the bucket exists
-        const [buckets] = await this.storage.getBuckets();
-        const bucketExists = buckets.some(b => b.name === bucketName);
+        try {
+            // Check if the bucket exists
+            const [buckets] = await this.storage.getBuckets();
+            const bucketExists = buckets.some(b => b.name === bucketName);
 
-        // If not, create it
-        if (!bucketExists) {
-            [bucket] = await this.storage.createBucket(bucketName);
-            console.log(`Bucket ${bucketName} created.`);
+            // If not, create it
+            if (!bucketExists) {
+                [bucket] = await this.storage.createBucket(bucketName);
+                console.log(`Bucket ${bucketName} created.`);
+            }
+        } catch (error) {
+            console.warn(`Failed to check or create bucket ${bucketName}. Will attempt to upload file.`);
         }
 
         try {
