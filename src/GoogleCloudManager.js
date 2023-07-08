@@ -2,13 +2,27 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { Storage } from '@google-cloud/storage';
 import { extname } from 'path';
 
+/**
+ * Represents a manager for interacting with Google Cloud services, including BigQuery and Google Cloud Storage.
+ */
 class GoogleCloudManager {
+    /**
+     * Creates a new instance of the GoogleCloudManager class.
+     * @param {string} keyFilename The path to the Google Cloud service account key file.
+     */
     constructor(keyFilename) {
         this.keyFilename = keyFilename;
         this.bigquery = new BigQuery({ keyFilename: this.keyFilename });
         this.storage = new Storage({ keyFilename: this.keyFilename });
     }
 
+    /**
+     * Uploads the specified file to the specified Google Cloud Storage bucket.
+     * @param {string} filePath The path to the file to upload.
+     * @param {string} bucketName The name of the Google Cloud Storage bucket.
+     * @returns {Promise<void>} A Promise that resolves when the upload is successful.
+     * @throws {Error} If the file type is invalid. Only .csv and .tsv files are allowed.
+     */
     async uploadToGCS(filePath, bucketName) {
         const extension = extname(filePath);
         if (extension !== '.csv' && extension !== '.tsv') {
@@ -32,6 +46,14 @@ class GoogleCloudManager {
         }
     }
 
+    /**
+     * Loads the specified file from Google Cloud Storage to BigQuery.
+     * @param {string} datasetId The ID of the BigQuery dataset.
+     * @param {string} tableId The ID of the BigQuery table.
+     * @param {string} bucketName The name of the Google Cloud Storage bucket.
+     * @param {string} filePath The path to the file in Google Cloud Storage.
+     * @returns {Promise<void>} A Promise that resolves when the load is successful.
+     */
     async loadToBigQuery(datasetId, tableId, bucketName, filePath) {
         await this.uploadToGCS(filePath, bucketName);
 
@@ -64,6 +86,20 @@ class GoogleCloudManager {
             .load(this.storage.bucket(bucketName).file(fileName), metadata);
 
         console.log(`Job ${job.id} completed.`);
+    }
+
+    /**
+     * Runs the specified SQL query in BigQuery.
+     * @param {string} sql The SQL query to run.
+     * @returns {Promise<any>} A Promise that resolves with the query response or rejects with an error.
+     */
+    async runQuery(sql) {
+        try {
+            const sqlResponse = await this.bigquery.query(sql);
+            return sqlResponse;
+        } catch (err) {
+            return err;
+        }
     }
 }
 
