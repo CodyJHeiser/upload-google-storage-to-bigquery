@@ -65,7 +65,7 @@ class GoogleCloudManager {
             fieldDelimiter = '\t';
         }
 
-        const metadata = {
+        const loadMetadata = {
             sourceFormat: sourceFormat,
             skipLeadingRows: 1,
             autodetect: true,
@@ -82,10 +82,43 @@ class GoogleCloudManager {
 
         const fileName = filePath.split('/').pop();
 
-        const [job] = await table
-            .load(this.storage.bucket(bucketName).file(fileName), metadata);
+        // Load data into a temporary table
+        const tempTableId = tableId + "_temp";
+        const tempTable = dataset.table(tempTableId);
+        const tempExists = await tempTable.exists();
+        if (!tempExists[0]) {
+            await tempTable.create();
+        }
 
-        console.log(`Job ${job.id} completed.`);
+        const [job] = await tempTable
+            .load(this.storage.bucket(bucketName).file(fileName), loadMetadata);
+
+        console.log(`Temp table job ${job.id} completed.`);
+
+        // Retrieve the schema
+        const [tableMetadata] = await tempTable.getMetadata();
+        const schema = tableMetadata.schema.fields.map(field => field.name);
+
+        // Build the ON clause
+        const onClause = schema.map(col => `T.${col} = S.${col}`).join(' AND ');
+
+        // Merge data from temporary table to main table
+        const query = `MERGE ${datasetId}.${tableId} T
+                   USING ${datasetId}.${tempTableId} S
+                   ON ${onClause}
+                   WHEN NOT MATCHED THEN
+                       INSERT ROW`;
+        const options = {
+            query: query,
+            location: 'US',
+        };
+        const [job2] = await this.bigquery.createQueryJob(options);
+        const [rows] = await job2.getQueryResults();
+
+        console.log(`Merge job ${job2.id} completed.`);
+
+        // Delete temporary table
+        await tempTable.delete();
     }
 
     /**
