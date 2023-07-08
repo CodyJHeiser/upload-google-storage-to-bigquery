@@ -1,4 +1,3 @@
-```markdown
 # Upload Google Storage to BigQuery
 
 This is an npm package that provides functionality to upload files from Google Cloud Storage to BigQuery.
@@ -33,6 +32,14 @@ uploader.loadToBigQuery('dataset-id', 'table-id', 'bucket-name', 'path/to/file.c
   .catch((error) => {
     console.error('Failed to load file to BigQuery:', error);
   });
+
+uploader.runQuery('SELECT * FROM `myDataset.myTable`')
+  .then((result) => {
+    console.log('Query result:', result);
+  })
+  .catch((error) => {
+    console.error('Failed to run query:', error);
+  });
 ```
 
 Replace `'path/to/keyfile.json'` with the path to your Google Cloud service account key file. Make sure you have the necessary permissions to access Google Cloud Storage and BigQuery.
@@ -62,6 +69,12 @@ Loads the specified file from Google Cloud Storage to BigQuery.
 - `tableId`: The ID of the BigQuery table.
 - `bucketName`: The name of the Google Cloud Storage bucket.
 - `filePath`: The path to the file in Google Cloud Storage.
+
+#### `runQuery(sql: string): Promise<any>`
+
+Runs the specified SQL query in BigQuery.
+
+- `sql`: The SQL query to run.
 
 ## Contributing
 
