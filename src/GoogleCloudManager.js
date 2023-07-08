@@ -29,7 +29,17 @@ class GoogleCloudManager {
             throw new Error('Invalid file type. Only .csv and .tsv files are allowed.');
         }
 
-        const bucket = this.storage.bucket(bucketName);
+        let bucket = this.storage.bucket(bucketName);
+
+        // Check if the bucket exists
+        const [buckets] = await this.storage.getBuckets();
+        const bucketExists = buckets.some(b => b.name === bucketName);
+
+        // If not, create it
+        if (!bucketExists) {
+            [bucket] = await this.storage.createBucket(bucketName);
+            console.log(`Bucket ${bucketName} created.`);
+        }
 
         try {
             await bucket.upload(filePath, {
