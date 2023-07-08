@@ -88,51 +88,59 @@ class GoogleCloudManager {
 
         const dataset = this.bigquery.dataset(datasetId);
         const table = dataset.table(tableId);
-        const exists = await table.exists();
-        if (!exists[0]) {
-            await table.create();
-            console.log(`Table ${tableId} created.`);
-        }
-
+        const [exists] = await table.exists();
         const fileName = filePath.split('/').pop();
 
-        // Load data into a temporary table
-        const tempTableId = tableId + "_temp";
-        const tempTable = dataset.table(tempTableId);
-        const tempExists = await tempTable.exists();
-        if (!tempExists[0]) {
-            await tempTable.create();
+        if (!exists) {
+            // If the table does not exist, create it and load data directly into the table
+            await table.create();
+            console.log(`Table ${tableId} created.`);
+            const [job] = await table.load(this.storage.bucket(bucketName).file(fileName), loadMetadata);
+            console.log(`Job ${job.id} completed.`);
+        } else {
+            const [metadata] = await table.getMetadata();
+            if (!metadata.schema || metadata.schema.fields.length === 0) {
+                // If the table does not have a schema, load data directly
+                const [job] = await table.load(this.storage.bucket(bucketName).file(fileName), loadMetadata);
+                console.log(`Job ${job.id} completed.`);
+            } else {
+                // If the table has a schema, load data into a temporary table
+                const tempTableId = tableId + "_temp";
+                const tempTable = dataset.table(tempTableId);
+                const [tempExists] = await tempTable.exists();
+                if (!tempExists) {
+                    await tempTable.create();
+                }
+
+                const [job] = await tempTable.load(this.storage.bucket(bucketName).file(fileName), loadMetadata);
+
+                console.log(`Temp table job ${job.id} completed.`);
+
+                // Retrieve the schema
+                const schema = metadata.schema.fields.map(field => field.name);
+
+                // Build the ON clause
+                const onClause = schema.map(col => `T.${col} = S.${col}`).join(' AND ');
+
+                // Merge data from temporary table to main table
+                const query = `MERGE ${datasetId}.${tableId} T
+                            USING ${datasetId}.${tempTableId} S
+                            ON ${onClause}
+                            WHEN NOT MATCHED THEN
+                                INSERT ROW`;
+                const options = {
+                    query: query,
+                    location: 'US',
+                };
+                const [job2] = await this.bigquery.createQueryJob(options);
+                const [rows] = await job2.getQueryResults();
+
+                console.log(`Merge job ${job2.id} completed.`);
+
+                // Delete temporary table
+                await tempTable.delete();
+            }
         }
-
-        const [job] = await tempTable
-            .load(this.storage.bucket(bucketName).file(fileName), loadMetadata);
-
-        console.log(`Temp table job ${job.id} completed.`);
-
-        // Retrieve the schema
-        const [tableMetadata] = await tempTable.getMetadata();
-        const schema = tableMetadata.schema.fields.map(field => field.name);
-
-        // Build the ON clause
-        const onClause = schema.map(col => `T.${col} = S.${col}`).join(' AND ');
-
-        // Merge data from temporary table to main table
-        const query = `MERGE ${datasetId}.${tableId} T
-                   USING ${datasetId}.${tempTableId} S
-                   ON ${onClause}
-                   WHEN NOT MATCHED THEN
-                       INSERT ROW`;
-        const options = {
-            query: query,
-            location: 'US',
-        };
-        const [job2] = await this.bigquery.createQueryJob(options);
-        const [rows] = await job2.getQueryResults();
-
-        console.log(`Merge job ${job2.id} completed.`);
-
-        // Delete temporary table
-        await tempTable.delete();
     }
 
     /**
